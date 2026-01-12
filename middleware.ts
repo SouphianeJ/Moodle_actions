@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
     }
     // Return 401 for API requests
     return NextResponse.json(
-      { error: 'Non authentifié' },
+      { error: 'Unauthorized' },
       { status: 401 }
     );
   }
@@ -75,7 +75,7 @@ export async function middleware(request: NextRequest) {
     // Clear invalid cookie and redirect/return error
     const response = !pathname.startsWith('/api/')
       ? NextResponse.redirect(new URL('/login', request.url))
-      : NextResponse.json({ error: 'Session invalide' }, { status: 401 });
+      : NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     
     response.cookies.delete(COOKIE_NAME);
     return response;

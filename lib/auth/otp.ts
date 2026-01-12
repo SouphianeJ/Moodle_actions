@@ -94,19 +94,19 @@ export async function verifyOtp(email: string, otp: string): Promise<{ valid: bo
   const record = await collection.findOne({ email });
   
   if (!record) {
-    return { valid: false, error: 'Code invalide ou expiré' };
+    return { valid: false, error: 'Code invalide' };
   }
   
   // Check expiry
   if (record.expiresAt < new Date()) {
     await collection.deleteOne({ email });
-    return { valid: false, error: 'Code expiré' };
+    return { valid: false, error: 'Code invalide' };
   }
   
   // Check attempts
   if (record.attempts >= MAX_ATTEMPTS) {
     await collection.deleteOne({ email });
-    return { valid: false, error: 'Trop de tentatives' };
+    return { valid: false, error: 'Code invalide' };
   }
   
   // Increment attempts
@@ -118,7 +118,7 @@ export async function verifyOtp(email: string, otp: string): Promise<{ valid: bo
   // Verify OTP
   const hashedInput = hashOtp(otp);
   if (hashedInput !== record.hashedOtp) {
-    return { valid: false, error: 'Code incorrect' };
+    return { valid: false, error: 'Code invalide' };
   }
   
   // Delete OTP after successful verification
