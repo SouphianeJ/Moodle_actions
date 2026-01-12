@@ -159,12 +159,51 @@ Assurez-vous d'autoriser les IP de Vercel dans la liste blanche MongoDB Atlas :
 - [Design System](./docs/design-system.md) - Charte graphique et tokens
 - [Composants UI](./docs/components.md) - Catalogue des composants
 
+## 🎯 Actions Disponibles
+
+### Récupérer les feedback d'un devoir
+
+Cette action permet d'exporter les feedbacks des étudiants pour un devoir Moodle au format CSV.
+
+**Page UI** : `/actions/assignment-feedback`
+
+**Entrée utilisateur** : L'identifiant de l'évaluation (cmid)
+- C'est le paramètre `id` visible dans l'URL Moodle de la page du devoir
+- Exemple : dans `https://moodle.example.com/mod/assign/view.php?id=9267`, le cmid est `9267`
+
+**Sortie** : Un fichier CSV avec les colonnes :
+- `Nom` : Nom de famille de l'étudiant
+- `Prenom` : Prénom de l'étudiant
+- `Note` : Note attribuée (vide si non noté)
+- `Feedback` : Commentaire texte du feedback (HTML converti en texte brut)
+
+**Caractéristiques du CSV** :
+- Délimiteur : point-virgule (`;`)
+- Encodage : UTF-8 avec BOM (pour compatibilité Excel)
+- Les valeurs contenant des caractères spéciaux sont correctement échappées
+
+**Endpoint API** : `GET /api/actions/assignment-feedback/export?cmid=<cmid>`
+- Authentification JWT requise
+- Retourne directement le fichier CSV en téléchargement
+
+**Workflow technique** :
+1. Résolution du cmid vers l'ID d'instance du devoir (`core_course_get_course_module`)
+2. Récupération des soumissions (`mod_assign_get_submissions`)
+3. Récupération des informations utilisateurs en batch (`core_user_get_users_by_field`)
+4. Récupération du statut de soumission pour chaque étudiant (`mod_assign_get_submission_status`)
+5. Génération du CSV
+
+**Limites** :
+- Le cmid doit correspondre à un module de type "assign" (devoir)
+- Les appels Moodle sont limités en concurrence (5 simultanés) pour éviter le throttling
+- Les fichiers attachés aux feedbacks ne sont pas inclus (texte uniquement)
+
 ## 🛤️ Roadmap
 
 - [x] Authentification OTP par email
 - [x] Protection JWT des routes
 - [x] Page "Récupérer les feedback d'un devoir" (UI)
-- [ ] Intégration API Moodle pour les feedbacks
+- [x] Intégration API Moodle pour les feedbacks
 - [ ] Nouvelles actions Moodle
 - [ ] Automatisations planifiées
 
