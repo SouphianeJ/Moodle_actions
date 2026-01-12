@@ -5,6 +5,9 @@
  * and removing all HTML tags while decoding HTML entities.
  */
 
+// Maximum consecutive newlines allowed in output
+const MAX_CONSECUTIVE_NEWLINES = 2;
+
 const HTML_ENTITIES: Record<string, string> = {
   '&nbsp;': ' ',
   '&amp;': '&',
@@ -37,15 +40,20 @@ const HTML_ENTITIES: Record<string, string> = {
   '&frac34;': '3/4',
 };
 
+// Pre-compiled regex for named HTML entities (case-insensitive)
+const ENTITY_PATTERN = new RegExp(
+  Object.keys(HTML_ENTITIES).join('|'),
+  'gi'
+);
+
 /**
  * Decodes HTML entities to their corresponding characters
  */
 function decodeHtmlEntities(text: string): string {
-  // Decode named entities
-  let result = text;
-  for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
-    result = result.replace(new RegExp(entity, 'gi'), char);
-  }
+  // Decode named entities using pre-compiled pattern
+  let result = text.replace(ENTITY_PATTERN, (match) => {
+    return HTML_ENTITIES[match.toLowerCase()] || match;
+  });
   
   // Decode numeric entities (decimal)
   result = result.replace(/&#(\d+);/g, (_, code) => {
@@ -73,24 +81,29 @@ export function htmlToText(html: string | null | undefined): string {
   
   let text = html;
   
-  // Remove script and style content entirely
-  text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  // First pass: Convert block elements to line breaks before removing tags
+  // This preserves document structure in the text output
+  text = text.replace(/<\/p[\s>]/gi, '\n');
+  text = text.replace(/<\/div[\s>]/gi, '\n');
+  text = text.replace(/<br[\s/>]/gi, '\n');
+  text = text.replace(/<\/li[\s>]/gi, '\n');
+  text = text.replace(/<\/h[1-6][\s>]/gi, '\n');
+  text = text.replace(/<\/tr[\s>]/gi, '\n');
+  text = text.replace(/<ul[\s>]/gi, '\n');
+  text = text.replace(/<ol[\s>]/gi, '\n');
   
-  // Convert block elements to line breaks
-  text = text.replace(/<\/p>/gi, '\n');
-  text = text.replace(/<\/div>/gi, '\n');
-  text = text.replace(/<br\s*\/?>/gi, '\n');
-  text = text.replace(/<\/li>/gi, '\n');
-  text = text.replace(/<\/h[1-6]>/gi, '\n');
-  text = text.replace(/<\/tr>/gi, '\n');
+  // Remove all HTML tags by iteratively removing angle-bracketed content
+  // This is for text extraction from Moodle feedback, output goes to CSV (not HTML)
+  // Using a loop ensures complete removal even with malformed/nested markup
+  const MAX_ITERATIONS = 10;
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    const newText = text.replace(/<[^<>]*>/g, '');
+    if (newText === text) break;
+    text = newText;
+  }
   
-  // Add line break before lists
-  text = text.replace(/<ul[^>]*>/gi, '\n');
-  text = text.replace(/<ol[^>]*>/gi, '\n');
-  
-  // Remove all HTML tags
-  text = text.replace(/<[^>]+>/g, '');
+  // Remove any remaining angle brackets that might be malformed tags
+  text = text.replace(/</g, '').replace(/>/g, '');
   
   // Decode HTML entities
   text = decodeHtmlEntities(text);
@@ -101,8 +114,9 @@ export function htmlToText(html: string | null | undefined): string {
     .map(line => line.replace(/\s+/g, ' ').trim())
     .join('\n');
   
-  // Remove multiple consecutive line breaks (max 2)
-  text = text.replace(/\n{3,}/g, '\n\n');
+  // Remove excessive consecutive line breaks
+  const newlinePattern = new RegExp(`\n{${MAX_CONSECUTIVE_NEWLINES + 1},}`, 'g');
+  text = text.replace(newlinePattern, '\n'.repeat(MAX_CONSECUTIVE_NEWLINES));
   
   // Trim leading/trailing whitespace
   text = text.trim();
