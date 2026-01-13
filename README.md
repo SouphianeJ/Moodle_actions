@@ -158,6 +158,7 @@ Assurez-vous d'autoriser les IP de Vercel dans la liste blanche MongoDB Atlas :
 
 - [Design System](./docs/design-system.md) - Charte graphique et tokens
 - [Composants UI](./docs/components.md) - Catalogue des composants
+- [API Moodle - Notes de devoir](./docs/moodle-assignment-grades-api.md) - Documentation technique pour intégrer la récupération des notes d'un devoir Moodle dans une application externe
 
 ## 🎯 Actions Disponibles
 
