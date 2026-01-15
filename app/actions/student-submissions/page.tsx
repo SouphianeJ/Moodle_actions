@@ -230,50 +230,74 @@ export default function StudentSubmissionsPage() {
       return;
     }
     
-    const nextIndex = selectedStudentIndex + 1;
-    const nextStudent = enrolledStudents[nextIndex];
-    
     setLoadingFiles(true);
     setAlert(null);
-    setSelectedStudentIndex(nextIndex);
     
-    try {
-      const selectedAssignmentsList = assignments.filter(a => selectedAssignments.has(a.assignid));
+    const selectedAssignmentsList = assignments.filter(a => selectedAssignments.has(a.assignid));
+    const skippedStudents: string[] = [];
+    const startIndex = selectedStudentIndex;
+    
+    // Iterate through students starting from the next one
+    for (let i = selectedStudentIndex + 1; i < enrolledStudents.length; i++) {
+      const student = enrolledStudents[i];
       
-      const response = await fetch('/api/actions/student-submissions/files', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: nextStudent.id,
-          assignments: selectedAssignmentsList,
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || `Erreur ${response.status}`);
-      }
-      
-      setStudentData(data.data);
-      
-      if (data.data.files.length === 0) {
-        setAlert({
-          variant: 'warning',
-          message: `Aucun fichier soumis trouvé pour ${nextStudent.firstName} ${nextStudent.lastName}.`,
+      try {
+        const response = await fetch('/api/actions/student-submissions/files', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: student.id,
+            assignments: selectedAssignmentsList,
+          }),
         });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || `Erreur ${response.status}`);
+        }
+        
+        // If the student has files, stop here and show them
+        if (data.data.files.length > 0) {
+          setSelectedStudentIndex(i);
+          setStudentData(data.data);
+          if (skippedStudents.length > 0) {
+            setAlert({
+              variant: 'info',
+              message: `${skippedStudents.length} étudiant(s) sans fichiers ignoré(s): ${skippedStudents.join(', ')}.`,
+            });
+          }
+          setLoadingFiles(false);
+          return;
+        }
+        
+        // Student has no files, add to skipped list and continue
+        skippedStudents.push(`${student.firstName} ${student.lastName}`);
+        
+      } catch (error) {
+        console.error('Error loading student:', error);
+        // Reset to the starting index on error
+        setSelectedStudentIndex(startIndex);
+        setAlert({
+          variant: 'error',
+          message: error instanceof Error ? error.message : 'Impossible de charger les fichiers.',
+        });
+        setLoadingFiles(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error loading next student:', error);
-      setAlert({
-        variant: 'error',
-        message: error instanceof Error ? error.message : 'Impossible de charger les fichiers.',
-      });
-    } finally {
-      setLoadingFiles(false);
     }
+    
+    // If we've gone through all remaining students and none have files
+    // Set to last student checked to indicate we've reached the end
+    setSelectedStudentIndex(enrolledStudents.length - 1);
+    setStudentData(null);
+    setAlert({
+      variant: 'warning',
+      message: `Aucun fichier soumis trouvé pour les ${skippedStudents.length} étudiant(s) restant(s): ${skippedStudents.join(', ')}.`,
+    });
+    setLoadingFiles(false);
   }, [selectedStudentIndex, enrolledStudents, assignments, selectedAssignments]);
 
   return (
