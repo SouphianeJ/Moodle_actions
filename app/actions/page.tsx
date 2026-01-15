@@ -16,6 +16,12 @@ const actions: ActionItem[] = [
     description: 'Récupérez tous les feedbacks des étudiants pour une évaluation donnée.',
     href: '/actions/assignment-feedback',
   },
+  {
+    id: 'student-submissions',
+    title: 'Voir les rendus étudiants',
+    description: 'Visualisez les fichiers soumis par les étudiants pour un ou plusieurs devoirs.',
+    href: '/actions/student-submissions',
+  },
 ];
 
 export default function ActionsPage() {
