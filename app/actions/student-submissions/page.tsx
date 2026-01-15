@@ -38,14 +38,22 @@ interface StudentSubmissionData {
   status: 'submitted' | 'draft' | 'nosubmission';
 }
 
+interface EnrolledStudent {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email?: string;
+}
+
 export default function StudentSubmissionsPage() {
   const [courseId, setCourseId] = useState('');
-  const [studentId, setStudentId] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [alert, setAlert] = useState<AlertState>(null);
   const [assignments, setAssignments] = useState<AssignmentInfo[]>([]);
   const [selectedAssignments, setSelectedAssignments] = useState<Set<number>>(new Set());
+  const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>([]);
+  const [selectedStudentIndex, setSelectedStudentIndex] = useState<number>(-1);
   const [studentData, setStudentData] = useState<StudentSubmissionData | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -66,26 +74,44 @@ export default function StudentSubmissionsPage() {
     setAlert(null);
     setAssignments([]);
     setSelectedAssignments(new Set());
+    setEnrolledStudents([]);
+    setSelectedStudentIndex(-1);
     setStudentData(null);
     
     try {
-      const response = await fetch(`/api/actions/student-submissions/assignments?courseId=${id}`);
-      const data = await response.json();
+      // Fetch assignments and enrolled students in parallel
+      const [assignmentsResponse, studentsResponse] = await Promise.all([
+        fetch(`/api/actions/student-submissions/assignments?courseId=${id}`),
+        fetch(`/api/actions/student-submissions/enrolled-students?courseId=${id}`),
+      ]);
       
-      if (!response.ok) {
-        throw new Error(data.error || `Erreur ${response.status}`);
+      const assignmentsData = await assignmentsResponse.json();
+      const studentsData = await studentsResponse.json();
+      
+      if (!assignmentsResponse.ok) {
+        throw new Error(assignmentsData.error || `Erreur ${assignmentsResponse.status}`);
       }
       
-      if (data.assignments && data.assignments.length > 0) {
-        setAssignments(data.assignments);
-        setAlert({
-          variant: 'success',
-          message: `${data.assignments.length} devoir(s) trouvé(s).`,
-        });
+      if (assignmentsData.assignments && assignmentsData.assignments.length > 0) {
+        setAssignments(assignmentsData.assignments);
       } else {
         setAlert({
           variant: 'warning',
           message: 'Aucun devoir trouvé dans ce cours.',
+        });
+        return;
+      }
+      
+      if (studentsResponse.ok && studentsData.students && studentsData.students.length > 0) {
+        setEnrolledStudents(studentsData.students);
+        setAlert({
+          variant: 'success',
+          message: `${assignmentsData.assignments.length} devoir(s) et ${studentsData.students.length} étudiant(s) trouvé(s).`,
+        });
+      } else {
+        setAlert({
+          variant: 'warning',
+          message: `${assignmentsData.assignments.length} devoir(s) trouvé(s), mais aucun étudiant inscrit.`,
         });
       }
     } catch (error) {
@@ -119,18 +145,10 @@ export default function StudentSubmissionsPage() {
     }
   };
 
-  const handleLoadStudentFiles = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadStudentFilesForIndex = useCallback(async (studentIndex: number) => {
+    if (studentIndex < 0 || studentIndex >= enrolledStudents.length) return;
     
-    const userId = studentId.trim();
-    
-    if (!/^\d+$/.test(userId) || parseInt(userId, 10) <= 0) {
-      setAlert({
-        variant: 'error',
-        message: "L'identifiant de l'étudiant doit être un nombre entier positif.",
-      });
-      return;
-    }
+    const student = enrolledStudents[studentIndex];
     
     if (selectedAssignments.size === 0) {
       setAlert({
@@ -143,6 +161,7 @@ export default function StudentSubmissionsPage() {
     setLoadingFiles(true);
     setAlert(null);
     setStudentData(null);
+    setSelectedStudentIndex(studentIndex);
     
     try {
       const selectedAssignmentsList = assignments.filter(a => selectedAssignments.has(a.assignid));
@@ -153,7 +172,7 @@ export default function StudentSubmissionsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: parseInt(userId, 10),
+          userId: student.id,
           assignments: selectedAssignmentsList,
         }),
       });
@@ -169,12 +188,12 @@ export default function StudentSubmissionsPage() {
       if (data.data.files.length > 0) {
         setAlert({
           variant: 'success',
-          message: `${data.data.files.length} fichier(s) trouvé(s) pour ${data.data.firstName} ${data.data.lastName}.`,
+          message: `${data.data.files.length} fichier(s) trouvé(s) pour ${student.firstName} ${student.lastName}.`,
         });
       } else {
         setAlert({
           variant: 'warning',
-          message: `Aucun fichier soumis trouvé pour cet étudiant.`,
+          message: `Aucun fichier soumis trouvé pour ${student.firstName} ${student.lastName}.`,
         });
       }
     } catch (error) {
@@ -186,6 +205,16 @@ export default function StudentSubmissionsPage() {
     } finally {
       setLoadingFiles(false);
     }
+  }, [enrolledStudents, selectedAssignments, assignments]);
+
+  const handleStudentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const index = parseInt(e.target.value, 10);
+    if (index >= 0) {
+      loadStudentFilesForIndex(index);
+    } else {
+      setSelectedStudentIndex(-1);
+      setStudentData(null);
+    }
   };
 
   const handleOpenPreview = () => {
@@ -195,16 +224,18 @@ export default function StudentSubmissionsPage() {
   };
 
   const handleNextStudent = useCallback(async () => {
-    // Increment student ID and reload
-    const currentId = parseInt(studentId, 10);
-    if (isNaN(currentId)) return;
+    // Move to the next student in the enrolled list
+    if (selectedStudentIndex < 0 || selectedStudentIndex >= enrolledStudents.length - 1) {
+      // No next student available
+      return;
+    }
     
-    const nextId = currentId + 1;
-    setStudentId(String(nextId));
+    const nextIndex = selectedStudentIndex + 1;
+    const nextStudent = enrolledStudents[nextIndex];
     
-    // Trigger file loading for next student
     setLoadingFiles(true);
     setAlert(null);
+    setSelectedStudentIndex(nextIndex);
     
     try {
       const selectedAssignmentsList = assignments.filter(a => selectedAssignments.has(a.assignid));
@@ -215,7 +246,7 @@ export default function StudentSubmissionsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId: nextId,
+          userId: nextStudent.id,
           assignments: selectedAssignmentsList,
         }),
       });
@@ -231,7 +262,7 @@ export default function StudentSubmissionsPage() {
       if (data.data.files.length === 0) {
         setAlert({
           variant: 'warning',
-          message: `Aucun fichier soumis trouvé pour cet étudiant.`,
+          message: `Aucun fichier soumis trouvé pour ${nextStudent.firstName} ${nextStudent.lastName}.`,
         });
       }
     } catch (error) {
@@ -243,7 +274,7 @@ export default function StudentSubmissionsPage() {
     } finally {
       setLoadingFiles(false);
     }
-  }, [studentId, assignments, selectedAssignments]);
+  }, [selectedStudentIndex, enrolledStudents, assignments, selectedAssignments]);
 
   return (
     <AppShell>
@@ -323,31 +354,41 @@ export default function StudentSubmissionsPage() {
         </Card>
       )}
       
-      {/* Step 3: Load student files */}
-      {selectedAssignments.size > 0 && (
+      {/* Step 3: Select student from list */}
+      {selectedAssignments.size > 0 && enrolledStudents.length > 0 && (
         <Card className="max-w-2xl mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Étape 3 : Charger les fichiers d&apos;un étudiant
+            Étape 3 : Sélectionner un étudiant
           </h2>
-          <form onSubmit={handleLoadStudentFiles} className="flex gap-4 items-end">
+          <div className="flex gap-4 items-end">
             <div className="flex-1">
-              <Input
-                type="text"
-                label="ID de l'étudiant (userid)"
-                placeholder="Ex: 456"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-                helper="L'ID de l'utilisateur dans Moodle."
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Étudiant
+              </label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={selectedStudentIndex}
+                onChange={handleStudentSelect}
+                disabled={loadingFiles}
+              >
+                <option value={-1}>-- Sélectionner un étudiant --</option>
+                {enrolledStudents.map((student, index) => (
+                  <option key={student.id} value={index}>
+                    {student.lastName} {student.firstName}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-sm text-gray-500">
+                {enrolledStudents.length} étudiant(s) inscrit(s) au cours
+              </p>
             </div>
-            <Button
-              type="submit"
-              disabled={!studentId.trim() || loadingFiles}
-              loading={loadingFiles}
-            >
-              Charger
-            </Button>
-          </form>
+            {loadingFiles && (
+              <div className="flex items-center gap-2 text-gray-500">
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm">Chargement...</span>
+              </div>
+            )}
+          </div>
         </Card>
       )}
       
