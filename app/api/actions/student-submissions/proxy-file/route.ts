@@ -22,6 +22,20 @@ function isPreviewable(contentType: string): boolean {
 }
 
 /**
+ * Sanitize a filename for use in Content-Disposition header.
+ * Removes or escapes characters that could lead to header injection.
+ */
+function sanitizeFilename(filename: string): string {
+  // Remove newlines, carriage returns, and null bytes (header injection prevention)
+  let sanitized = filename.replace(/[\r\n\x00]/g, '');
+  
+  // Escape backslashes and quotes for proper RFC 2616 quoted-string format
+  sanitized = sanitized.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  
+  return sanitized;
+}
+
+/**
  * Extract filename from Content-Disposition header.
  * Handles both filename="..." and filename*=UTF-8''... formats.
  */
@@ -136,7 +150,8 @@ export async function GET(request: NextRequest) {
     if (isPreviewable(contentType)) {
       // Force inline for previewable files to display in iframe/img
       if (filename) {
-        headers['Content-Disposition'] = `inline; filename="${filename}"`;
+        const sanitized = sanitizeFilename(filename);
+        headers['Content-Disposition'] = `inline; filename="${sanitized}"`;
       } else {
         headers['Content-Disposition'] = 'inline';
       }
@@ -154,11 +169,9 @@ export async function GET(request: NextRequest) {
       headers['Content-Range'] = contentRange;
     }
     
+    // Only forward Accept-Ranges if Moodle provides it
     if (acceptRanges) {
       headers['Accept-Ranges'] = acceptRanges;
-    } else {
-      // Indicate that we support range requests
-      headers['Accept-Ranges'] = 'bytes';
     }
 
     // Return the streamed response with appropriate status (200 or 206)
