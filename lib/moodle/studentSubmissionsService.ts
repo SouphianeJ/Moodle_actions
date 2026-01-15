@@ -10,8 +10,10 @@ import {
   getSubmissionStatusFull,
   getUsersByIds,
   getMoodleToken,
+  getEnrolledUsersByCourseId,
   type SubmissionFile,
   type UserInfo,
+  type EnrolledUser,
 } from './client';
 
 // Concurrency limit for parallel requests
@@ -244,4 +246,77 @@ export function getFileUrlWithToken(fileurl: string): string {
   const url = new URL(fileurl);
   url.searchParams.set('token', token);
   return url.toString();
+}
+
+// ===== Enrolled students types and functions =====
+
+export interface EnrolledStudentInfo {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email?: string;
+}
+
+export interface EnrolledStudentsResult {
+  success: boolean;
+  data?: EnrolledStudentInfo[];
+  error?: string;
+}
+
+/**
+ * List all enrolled students in a course who can submit assignments
+ */
+export async function listEnrolledStudents(courseId: number): Promise<EnrolledStudentsResult> {
+  console.log(`[StudentSubmissions] Listing enrolled students for course ${courseId}`);
+  
+  const response = await getEnrolledUsersByCourseId(courseId);
+  
+  if (response.error) {
+    console.error(`[StudentSubmissions] Error getting enrolled users: ${response.error.message}`);
+    return {
+      success: false,
+      error: `Impossible de récupérer les étudiants inscrits: ${response.error.message}`,
+    };
+  }
+  
+  // The response from core_enrol_get_enrolled_users_with_capability returns an array with course info
+  // We need to extract the users from it
+  const data = response.data;
+  
+  // Handle the response format - it could be an array of users or a nested structure
+  let users: EnrolledUser[] = [];
+  
+  if (Array.isArray(data)) {
+    // Check if data is directly an array of users or has a nested structure
+    const firstItem = data[0] as unknown;
+    if (data.length > 0 && firstItem && typeof firstItem === 'object' && 'users' in firstItem) {
+      // Nested structure: [{ courseid, users: [...] }]
+      const nestedData = firstItem as { users: EnrolledUser[] };
+      users = nestedData.users || [];
+    } else {
+      // Direct array of users
+      users = data as EnrolledUser[];
+    }
+  }
+  
+  const students: EnrolledStudentInfo[] = users.map((user: EnrolledUser) => ({
+    id: user.id,
+    firstName: user.firstname,
+    lastName: user.lastname,
+    email: user.email,
+  }));
+  
+  // Sort by last name, then first name
+  students.sort((a, b) => {
+    const lastNameCompare = a.lastName.localeCompare(b.lastName, 'fr');
+    if (lastNameCompare !== 0) return lastNameCompare;
+    return a.firstName.localeCompare(b.firstName, 'fr');
+  });
+  
+  console.log(`[StudentSubmissions] Found ${students.length} enrolled students in course ${courseId}`);
+  
+  return {
+    success: true,
+    data: students,
+  };
 }
