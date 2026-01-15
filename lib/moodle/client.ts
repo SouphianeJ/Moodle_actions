@@ -295,11 +295,11 @@ export async function getSubmissionStatusFull(assignmentId: number, userId: numb
 }
 
 /**
- * Gets enrolled users for a course module
+ * Gets enrolled users for a course that can submit assignments
  */
-export async function getEnrolledUsersByCmid(cmid: number): Promise<MoodleResponse<EnrolledUser[]>> {
+export async function getEnrolledUsersByCourseId(courseId: number): Promise<MoodleResponse<EnrolledUser[]>> {
   return callMoodleWS<EnrolledUser[]>('core_enrol_get_enrolled_users_with_capability', {
-    'coursecapabilities[0][courseid]': cmid,
+    'coursecapabilities[0][courseid]': courseId,
     'coursecapabilities[0][capabilities][0]': 'mod/assign:submit',
   });
 }

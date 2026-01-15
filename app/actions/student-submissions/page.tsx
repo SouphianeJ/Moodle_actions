@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { AppShell } from '@/components/layout';
 import { PageHeader, Card, Input, Button, Alert, Checkbox } from '@/components/ui';
 import { FilePreviewModal } from '@/components/student-submissions/FilePreviewModal';
+import { formatFileSize } from '@/lib/utils/format';
 
 type AlertState = {
   variant: 'info' | 'success' | 'warning' | 'error';
@@ -398,6 +399,7 @@ export default function StudentSubmissionsPage() {
       {/* File preview modal */}
       {showPreview && studentData && studentData.files.length > 0 && (
         <FilePreviewModal
+          key={studentData.userId}
           studentData={studentData}
           onClose={() => setShowPreview(false)}
           onNextStudent={handleNextStudent}
@@ -405,12 +407,4 @@ export default function StudentSubmissionsPage() {
       )}
     </AppShell>
   );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui';
+import { formatFileSize } from '@/lib/utils/format';
 
 interface StudentFileInfo {
   filename: string;
@@ -30,49 +31,11 @@ interface FilePreviewModalProps {
 }
 
 export function FilePreviewModal({ studentData, onClose, onNextStudent }: FilePreviewModalProps) {
-  // Use studentData.userId as key for resetting state
-  const [internalState, setInternalState] = useState({
-    fileIndex: 0,
-    loading: true,
-    error: null as string | null,
-    studentId: studentData.userId,
-  });
-
-  // When student changes, reset state
-  const currentFileIndex = internalState.studentId === studentData.userId 
-    ? internalState.fileIndex 
-    : 0;
-  const loading = internalState.studentId === studentData.userId
-    ? internalState.loading 
-    : true;
-  const error = internalState.studentId === studentData.userId
-    ? internalState.error 
-    : null;
-
-  // Sync state when student changes
-  if (internalState.studentId !== studentData.userId) {
-    setInternalState({
-      fileIndex: 0,
-      loading: true,
-      error: null,
-      studentId: studentData.userId,
-    });
-  }
-
-  const setCurrentFileIndex = (idx: number | ((prev: number) => number)) => {
-    setInternalState(prev => ({
-      ...prev,
-      fileIndex: typeof idx === 'function' ? idx(prev.fileIndex) : idx,
-    }));
-  };
-
-  const setLoading = (val: boolean) => {
-    setInternalState(prev => ({ ...prev, loading: val }));
-  };
-
-  const setError = (val: string | null) => {
-    setInternalState(prev => ({ ...prev, error: val }));
-  };
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Note: State is reset by React when the key prop changes (parent uses key={studentData.userId})
 
   const currentFile = studentData.files[currentFileIndex];
   const totalFiles = studentData.files.length;
@@ -388,12 +351,4 @@ export function FilePreviewModal({ studentData, onClose, onNextStudent }: FilePr
       </div>
     </div>
   );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
