@@ -18,3 +18,6 @@ export type { AlertProps, AlertVariant } from './Alert';
 
 export { FormRow } from './FormRow';
 export type { FormRowProps } from './FormRow';
+
+export { Checkbox } from './Checkbox';
+export type { CheckboxProps } from './Checkbox';

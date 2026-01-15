@@ -147,6 +147,89 @@ export interface UserInfo {
   email?: string;
 }
 
+// ===== Course contents types =====
+
+export interface CourseModule {
+  id: number; // cmid (course module id)
+  instance: number; // assignid for assign modules
+  modname: string;
+  name: string;
+  visible?: number;
+  url?: string;
+}
+
+export interface CourseSection {
+  id: number;
+  name: string;
+  modules: CourseModule[];
+}
+
+export type CourseContentsResponse = CourseSection[];
+
+// ===== Submission file types =====
+
+export interface SubmissionFile {
+  filename: string;
+  filepath: string;
+  filesize: number;
+  fileurl: string;
+  mimetype: string;
+  timemodified?: number;
+}
+
+export interface SubmissionPlugin {
+  type: string;
+  name: string;
+  fileareas?: Array<{
+    area: string;
+    files: SubmissionFile[];
+  }>;
+}
+
+export interface SubmissionAttempt {
+  id: number;
+  userid: number;
+  status: string;
+  attemptnumber: number;
+  timemodified: number;
+  plugins?: SubmissionPlugin[];
+}
+
+export interface SubmissionStatusFullResponse {
+  lastattempt?: {
+    submission?: SubmissionAttempt;
+    submissiongroupmemberswhoneedtosubmit?: number[];
+    teamsubmission?: SubmissionAttempt;
+  };
+  feedback?: {
+    grade?: {
+      grade: string;
+      gradefordisplay?: string;
+    };
+    plugins?: FeedbackPlugin[];
+  };
+  warnings?: Array<{ warningcode: string; message: string }>;
+}
+
+// ===== Enrolled users types =====
+
+export interface EnrolledUser {
+  id: number;
+  firstname: string;
+  lastname: string;
+  email?: string;
+  roles?: Array<{
+    roleid: number;
+    name: string;
+    shortname: string;
+  }>;
+}
+
+export interface EnrolledUsersByCmidResponse {
+  users?: EnrolledUser[];
+  warnings?: Array<{ warningcode: string; message: string }>;
+}
+
 export interface UsersResponse {
   users?: UserInfo[];
   warnings?: Array<{ warningcode: string; message: string }>;
@@ -192,4 +275,45 @@ export async function getUsersByIds(userIds: number[]): Promise<MoodleResponse<U
   });
   
   return callMoodleWS<UserInfo[]>('core_user_get_users_by_field', params);
+}
+
+/**
+ * Gets course contents (sections and modules) for a course
+ */
+export async function getCourseContents(courseId: number): Promise<MoodleResponse<CourseContentsResponse>> {
+  return callMoodleWS<CourseContentsResponse>('core_course_get_contents', { courseid: courseId });
+}
+
+/**
+ * Gets full submission status including file information for a specific user and assignment
+ */
+export async function getSubmissionStatusFull(assignmentId: number, userId: number): Promise<MoodleResponse<SubmissionStatusFullResponse>> {
+  return callMoodleWS<SubmissionStatusFullResponse>('mod_assign_get_submission_status', {
+    assignid: assignmentId,
+    userid: userId,
+  });
+}
+
+/**
+ * Gets enrolled users for a course that can submit assignments
+ */
+export async function getEnrolledUsersByCourseId(courseId: number): Promise<MoodleResponse<EnrolledUser[]>> {
+  return callMoodleWS<EnrolledUser[]>('core_enrol_get_enrolled_users_with_capability', {
+    'coursecapabilities[0][courseid]': courseId,
+    'coursecapabilities[0][capabilities][0]': 'mod/assign:submit',
+  });
+}
+
+/**
+ * Gets the Moodle token for file access
+ */
+export function getMoodleToken(): string | undefined {
+  return MOODLE_WS_TOKEN;
+}
+
+/**
+ * Gets the Moodle base URL
+ */
+export function getMoodleBaseUrl(): string | undefined {
+  return MOODLE_BASE_URL;
 }
