@@ -357,3 +357,11 @@ interface StudentFileInfo {
 - `app/api/actions/student-submissions/files/route.ts`
 - `app/api/actions/student-submissions/enrolled-students/route.ts`
 - `app/actions/student-submissions/page.tsx` (UI d’accès)
+
+## 10) Moodle Web Services
+
+So, to be exhaustive, the implementation of the full feature described would likely involve three web services:
+
+*   `core_course_get_contents` (to get assignments)
+*   `mod_assign_get_submission_status` (to get submission status and files)
+*   `core_enrol_get_enrolled_users` (or a similar one to get the list of students)
