@@ -235,6 +235,16 @@ export interface UsersResponse {
   warnings?: Array<{ warningcode: string; message: string }>;
 }
 
+export interface MoodleCourseSummary {
+  id: number;
+  shortname?: string;
+  fullname?: string;
+  displayname?: string;
+  categoryid?: number;
+  categoryname?: string;
+  visible?: number;
+}
+
 // ===== Typed helper functions for specific WS calls =====
 
 /**
@@ -278,6 +288,21 @@ export async function getUsersByIds(userIds: number[]): Promise<MoodleResponse<U
 }
 
 /**
+ * Gets users by their email addresses
+ */
+export async function getUsersByEmails(emails: string[]): Promise<MoodleResponse<UserInfo[]>> {
+  const params: Record<string, string | number> = {
+    field: 'email',
+  };
+
+  emails.forEach((email, index) => {
+    params[`values[${index}]`] = email;
+  });
+
+  return callMoodleWS<UserInfo[]>('core_user_get_users_by_field', params);
+}
+
+/**
  * Gets course contents (sections and modules) for a course
  */
 export async function getCourseContents(courseId: number): Promise<MoodleResponse<CourseContentsResponse>> {
@@ -301,6 +326,15 @@ export async function getEnrolledUsersByCourseId(courseId: number): Promise<Mood
   return callMoodleWS<EnrolledUser[]>('core_enrol_get_enrolled_users_with_capability', {
     'coursecapabilities[0][courseid]': courseId,
     'coursecapabilities[0][capabilities][0]': 'mod/assign:submit',
+  });
+}
+
+/**
+ * Gets the list of courses a user is enrolled in
+ */
+export async function getUserCourses(userId: number): Promise<MoodleResponse<MoodleCourseSummary[]>> {
+  return callMoodleWS<MoodleCourseSummary[]>('core_enrol_get_users_courses', {
+    userid: userId,
   });
 }
 

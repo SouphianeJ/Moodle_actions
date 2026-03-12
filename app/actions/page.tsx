@@ -12,15 +12,21 @@ interface ActionItem {
 const actions: ActionItem[] = [
   {
     id: 'assignment-feedback',
-    title: 'Récupérer les feedback d\'un devoir',
-    description: 'Récupérez tous les feedbacks des étudiants pour une évaluation donnée.',
+    title: 'Recuperer les feedback d\'un devoir',
+    description: 'Recuperez tous les feedbacks des etudiants pour une evaluation donnee.',
     href: '/actions/assignment-feedback',
   },
   {
     id: 'student-submissions',
-    title: 'Voir les rendus étudiants',
-    description: 'Visualisez les fichiers soumis par les étudiants pour un ou plusieurs devoirs.',
+    title: 'Voir les rendus etudiants',
+    description: 'Visualisez les fichiers soumis par les etudiants pour un ou plusieurs devoirs.',
     href: '/actions/student-submissions',
+  },
+  {
+    id: 'teacher-sync-preview',
+    title: 'Previsualiser la sync enseignants',
+    description: 'Compare les enseignants Hyperplanning ILEPS avec leurs comptes et cours Moodle existants.',
+    href: '/actions/teacher-sync-preview',
   },
 ];
 
@@ -29,26 +35,26 @@ export default function ActionsPage() {
     <AppShell>
       <PageHeader
         title="Actions"
-        description="Choisissez une action à exécuter"
+        description="Choisissez une action a executer"
       />
-      
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {actions.map((action) => (
           <Link key={action.id} href={action.href}>
-            <Card className="h-full hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <Card className="h-full cursor-pointer transition-all duration-200 hover:border-blue-300 hover:shadow-md">
+              <h3 className="mb-2 text-lg font-semibold text-gray-900">
                 {action.title}
               </h3>
-              <p className="text-gray-600 text-sm">
+              <p className="text-sm text-gray-600">
                 {action.description}
               </p>
             </Card>
           </Link>
         ))}
       </div>
-      
+
       {actions.length === 0 && (
-        <Card className="text-center py-12">
+        <Card className="py-12 text-center">
           <p className="text-gray-500">
             Aucune action disponible pour le moment.
           </p>
