@@ -278,6 +278,111 @@ export interface MoodleCourseSectionWithDetails {
 
 export type MoodleCourseContentsDetailedResponse = MoodleCourseSectionWithDetails[];
 
+export interface MoodleSiteInfoFunction {
+  name: string;
+}
+
+export interface MoodleSiteInfo {
+  sitename?: string;
+  username?: string;
+  userid?: number;
+  functions?: MoodleSiteInfoFunction[];
+}
+
+export interface MoodleQuiz {
+  id: number;
+  course: number;
+  coursemodule: number;
+  name: string;
+  intro?: string;
+  introformat?: number;
+  visible?: boolean;
+  section?: number;
+  groupmode?: number;
+  groupingid?: number;
+  timeopen?: number;
+  timeclose?: number;
+  timelimit?: number;
+  preferredbehaviour?: string;
+  attempts?: number;
+  grademethod?: number;
+  questiondecimalpoints?: number;
+  shuffleanswers?: number;
+  sumgrades?: number;
+  grade?: number;
+  timecreated?: number;
+  timemodified?: number;
+  hasfeedback?: number;
+  hasquestions?: number;
+}
+
+export interface MoodleQuizzesByCoursesResponse {
+  quizzes?: MoodleQuiz[];
+  warnings?: Array<{ warningcode: string; message: string }>;
+}
+
+export interface MoodleQuizAccessInformation {
+  canattempt?: boolean;
+  canmanage?: boolean;
+  canpreview?: boolean;
+  canreviewmyattempts?: boolean;
+  canviewreports?: boolean;
+  accessrules?: string[];
+  activerulenames?: string[];
+  preventaccessreasons?: string[];
+  warnings?: Array<{ warningcode: string; message: string }>;
+}
+
+export interface MoodleQuizRequiredQtypesResponse {
+  questiontypes?: string[];
+  warnings?: Array<{ warningcode: string; message: string }>;
+}
+
+export interface MoodleQuizAttempt {
+  id: number;
+  quiz: number;
+  userid: number;
+  attempt: number;
+  uniqueid?: number;
+  layout?: string;
+  currentpage?: number;
+  preview?: number;
+  state?: string;
+  timestart?: number;
+  timefinish?: number;
+  timemodified?: number;
+  timemodifiedoffline?: number;
+  sumgrades?: number | null;
+}
+
+export interface MoodleQuizUserAttemptsResponse {
+  attempts?: MoodleQuizAttempt[];
+  warnings?: Array<{ warningcode: string; message: string }>;
+}
+
+export interface MoodleQuizStartAttemptResponse {
+  attempt?: MoodleQuizAttempt;
+  warnings?: Array<{ warningcode: string; message: string }>;
+}
+
+export interface MoodleQuizAttemptQuestion {
+  slot: number;
+  type: string;
+  page: number;
+  html: string;
+  status?: string;
+  number?: number;
+  maxmark?: number;
+}
+
+export interface MoodleQuizAttemptDataResponse {
+  attempt?: MoodleQuizAttempt;
+  messages?: string[];
+  nextpage?: number;
+  questions?: MoodleQuizAttemptQuestion[];
+  warnings?: Array<{ warningcode: string; message: string }>;
+}
+
 // ===== Typed helper functions for specific WS calls =====
 
 /**
@@ -406,6 +511,84 @@ export async function getEnrolledUsers(courseId: number): Promise<MoodleResponse
 export async function getCourseGroups(courseId: number): Promise<MoodleResponse<MoodleGroup[]>> {
   return callMoodleWS<MoodleGroup[]>('core_group_get_course_groups', {
     courseid: courseId,
+  });
+}
+
+/**
+ * Gets site information for the current token.
+ */
+export async function getSiteInfo(): Promise<MoodleResponse<MoodleSiteInfo>> {
+  return callMoodleWS<MoodleSiteInfo>('core_webservice_get_site_info');
+}
+
+/**
+ * Gets quizzes for one or more courses.
+ */
+export async function getQuizzesByCourses(courseIds: number[]): Promise<MoodleResponse<MoodleQuizzesByCoursesResponse>> {
+  const params: Record<string, string | number> = {};
+  courseIds.forEach((courseId, index) => {
+    params[`courseids[${index}]`] = courseId;
+  });
+
+  return callMoodleWS<MoodleQuizzesByCoursesResponse>('mod_quiz_get_quizzes_by_courses', params);
+}
+
+/**
+ * Gets access information for a quiz.
+ */
+export async function getQuizAccessInformation(quizId: number): Promise<MoodleResponse<MoodleQuizAccessInformation>> {
+  return callMoodleWS<MoodleQuizAccessInformation>('mod_quiz_get_quiz_access_information', {
+    quizid: quizId,
+  });
+}
+
+/**
+ * Gets the question types required by a quiz.
+ */
+export async function getQuizRequiredQtypes(quizId: number): Promise<MoodleResponse<MoodleQuizRequiredQtypesResponse>> {
+  return callMoodleWS<MoodleQuizRequiredQtypesResponse>('mod_quiz_get_quiz_required_qtypes', {
+    quizid: quizId,
+  });
+}
+
+/**
+ * Gets attempts for a user on a quiz.
+ */
+export async function getQuizUserAttempts(
+  quizId: number,
+  userId: number,
+  status: 'all' | 'finished' | 'unfinished' = 'all'
+): Promise<MoodleResponse<MoodleQuizUserAttemptsResponse>> {
+  return callMoodleWS<MoodleQuizUserAttemptsResponse>('mod_quiz_get_user_attempts', {
+    quizid: quizId,
+    userid: userId,
+    status,
+  });
+}
+
+/**
+ * Starts a preview attempt for a quiz.
+ */
+export async function startQuizAttempt(
+  quizId: number,
+  forceNew = false
+): Promise<MoodleResponse<MoodleQuizStartAttemptResponse>> {
+  return callMoodleWS<MoodleQuizStartAttemptResponse>('mod_quiz_start_attempt', {
+    quizid: quizId,
+    forcenew: forceNew,
+  });
+}
+
+/**
+ * Gets rendered question data for one attempt page.
+ */
+export async function getQuizAttemptData(
+  attemptId: number,
+  page: number
+): Promise<MoodleResponse<MoodleQuizAttemptDataResponse>> {
+  return callMoodleWS<MoodleQuizAttemptDataResponse>('mod_quiz_get_attempt_data', {
+    attemptid: attemptId,
+    page,
   });
 }
 

@@ -34,8 +34,14 @@ interface QuizInfo {
   closeAt: number | null;
   durationSeconds: number | null;
   description: string | null;
+  questionCount: number | null;
+  requiredQuestionTypes: string[];
+  questionExamples: string[];
+  accessRules: string[];
+  preventAccessReasons: string[];
+  previewSource: 'cache' | 'existing_attempt' | 'new_attempt' | 'unavailable';
   groupOverridesStatus: 'unavailable_with_current_ws';
-  questionBankStatus: 'unavailable_with_current_ws';
+  questionBankStatus: 'preview_questions_only_until_core_question_ws';
 }
 
 interface CourseQuizzesResponse {
@@ -76,6 +82,19 @@ function formatDuration(durationSeconds: number | null): string {
   }
 
   return parts.join(' ');
+}
+
+function formatPreviewSource(source: QuizInfo['previewSource']): string {
+  switch (source) {
+    case 'cache':
+      return 'cache';
+    case 'existing_attempt':
+      return 'tentative preview existante';
+    case 'new_attempt':
+      return 'nouvelle tentative preview';
+    default:
+      return 'indisponible';
+  }
 }
 
 export default function CourseQuizzesPage() {
@@ -276,6 +295,20 @@ export default function CourseQuizzesPage() {
                     </p>
                   </div>
                   <div>
+                    <p className="text-sm font-medium text-gray-700">Nombre de questions</p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {quiz.questionCount ?? 'Indisponible via les WS Moodle actuellement exposes'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Types de questions</p>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {quiz.requiredQuestionTypes.length > 0
+                        ? quiz.requiredQuestionTypes.join(', ')
+                        : 'Indisponible via les WS Moodle actuellement exposes'}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-sm font-medium text-gray-700">Derogations de groupe</p>
                     <p className="mt-1 text-sm text-gray-600">
                       {quiz.groupOverridesStatus === 'unavailable_with_current_ws'
@@ -286,11 +319,56 @@ export default function CourseQuizzesPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-700">Banque de questions</p>
                     <p className="mt-1 text-sm text-gray-600">
-                      {quiz.questionBankStatus === 'unavailable_with_current_ws'
-                        ? 'Indisponible via les WS Moodle actuellement exposes'
+                      {quiz.questionBankStatus === 'preview_questions_only_until_core_question_ws'
+                        ? 'Questions preview disponibles, categories encore indisponibles sans core_question_*'
                         : quiz.questionBankStatus}
                     </p>
                   </div>
+                </div>
+
+                {quiz.accessRules.length > 0 && (
+                  <div className="mt-5">
+                    <p className="text-sm font-medium text-gray-700">Regles d&apos;acces</p>
+                    <ul className="mt-2 list-disc pl-5 text-sm text-gray-600">
+                      {quiz.accessRules.map((rule) => (
+                        <li key={rule}>{rule}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {quiz.preventAccessReasons.length > 0 && (
+                  <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-medium text-amber-800">Restriction actuelle</p>
+                    <ul className="mt-2 list-disc pl-5 text-sm text-amber-700">
+                      {quiz.preventAccessReasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Exemples de questions</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Source: {formatPreviewSource(quiz.previewSource)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {quiz.questionExamples.length > 0 ? (
+                    <ul className="mt-3 list-disc pl-5 text-sm text-gray-700">
+                      {quiz.questionExamples.map((example) => (
+                        <li key={example}>{example}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-sm text-gray-600">
+                      Aucun exemple de question disponible pour le moment.
+                    </p>
+                  )}
                 </div>
               </Card>
             ))}

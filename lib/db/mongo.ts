@@ -19,6 +19,11 @@ function getMongoUri(): string {
   return uri;
 }
 
+function getMongoDbName(): string | undefined {
+  const dbName = process.env.MONGODB_DBNAME?.trim();
+  return dbName || undefined;
+}
+
 async function connectToDatabase(): Promise<MongoConnection> {
   if (cached) {
     return cached;
@@ -28,7 +33,7 @@ async function connectToDatabase(): Promise<MongoConnection> {
   
   cached = client.connect().then((client) => ({
     client,
-    db: client.db(),
+    db: client.db(getMongoDbName()),
   }));
 
   global._mongoClientPromise = cached;

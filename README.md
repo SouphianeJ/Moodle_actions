@@ -44,6 +44,7 @@ cp .env.example .env.local
 ```env
 # MongoDB Connection
 MONGODB_URI="mongodb+srv://username:password@cluster.mongodb.net/moodle_actions?retryWrites=true&w=majority"
+MONGODB_DBNAME="moodle_actions"
 
 # Moodle Configuration
 MOODLE_BASE_URL="https://your-moodle.example.com"
@@ -143,6 +144,8 @@ L'application sera accessible sur [http://localhost:3000](http://localhost:3000)
 Dans les paramètres du projet Vercel, ajoutez toutes les variables de `.env.example` avec vos valeurs de production.
 
 **Important** : Utilisez un `JWT_SECRET` différent de celui de développement.
+
+`MONGODB_DBNAME` est optionnel. S'il est défini, l'application l'utilise explicitement ; sinon MongoDB utilise la base portée par `MONGODB_URI`.
 
 ### 3. Déployer
 
