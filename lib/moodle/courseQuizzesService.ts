@@ -8,7 +8,6 @@ import {
   getQuizAccessInformation,
   getQuizAttemptData,
   getQuizRequiredQtypes,
-  getQuizUserAttempts,
   getQuizzesByCourses,
   getSiteInfo,
   startQuizAttempt,
@@ -19,58 +18,20 @@ import {
   type MoodleQuizAttemptDataResponse,
   type MoodleQuizAttemptQuestion,
 } from './client';
+import type {
+  CourseQuizzesData,
+  CourseQuizzesGroup,
+  CourseQuizzesResponse,
+} from './courseQuizzesTypes';
 
 const PREVIEW_CACHE_COLLECTION = 'quiz_preview_cache';
 const PREVIEW_EXAMPLE_LIMIT = 3;
 const PREVIEW_FETCH_PAGE_LIMIT = 3;
 const QUIZ_ENRICH_CONCURRENCY = 3;
 
-export interface CourseQuizSummary {
-  cmid: number;
-  quizId: number;
-  sectionName: string;
-  name: string;
-  visible: boolean;
-  url?: string;
-  openAt: number | null;
-  closeAt: number | null;
-  durationSeconds: number | null;
-  description: string | null;
-  questionCount: number | null;
-  requiredQuestionTypes: string[];
-  questionExamples: string[];
-  accessRules: string[];
-  preventAccessReasons: string[];
-  previewSource: 'cache' | 'existing_attempt' | 'new_attempt' | 'unavailable';
-  groupOverridesStatus: 'unavailable_with_current_ws';
-  questionBankStatus: 'preview_questions_only_until_core_question_ws';
-}
-
-export interface CourseQuizzesCourse {
-  id: number;
-  fullname: string;
-  shortname: string;
-  visible: boolean;
-  enrolledCount: number;
-}
-
-export interface CourseQuizzesGroup {
-  id: number;
-  name: string;
-  description: string;
-}
-
-export interface CourseQuizzesData {
-  course: CourseQuizzesCourse;
-  groups: CourseQuizzesGroup[];
-  quizzes: CourseQuizSummary[];
-  dataLimitations: string[];
-}
-
-export interface CourseQuizzesResult {
+export interface CourseQuizzesResult extends Omit<CourseQuizzesResponse, 'course' | 'groups' | 'quizzes' | 'dataLimitations'> {
   success: boolean;
   data?: CourseQuizzesData;
-  error?: string;
 }
 
 interface QuizPreviewCacheEntry {
@@ -83,13 +44,15 @@ interface QuizPreviewCacheEntry {
   questionExamples: string[];
   questionTypes: string[];
   quizTimeModified: number | null;
+  lastReadSucceeded?: boolean;
   updatedAt: Date;
 }
 
 interface PreviewExtractionResult {
   questionCount: number | null;
   questionExamples: string[];
-  previewSource: 'cache' | 'existing_attempt' | 'new_attempt' | 'unavailable';
+  previewSource: 'cache' | 'new_attempt' | 'unavailable';
+  previewStatusMessage?: string;
 }
 
 const DATA_LIMITATIONS = [
@@ -184,16 +147,7 @@ async function readCachedPreview(
     return null;
   }
 
-  const quizTimeModified = quiz.timemodified || null;
-  if (
-    cacheEntry.quizTimeModified !== null &&
-    quizTimeModified !== null &&
-    cacheEntry.quizTimeModified !== quizTimeModified
-  ) {
-    return null;
-  }
-
-  if (!cacheEntry.questionExamples?.length && !cacheEntry.questionCount) {
+  if (!cacheEntry.attemptId) {
     return null;
   }
 
@@ -225,6 +179,7 @@ async function writeCachedPreview(
         questionExamples,
         questionTypes,
         quizTimeModified: quiz.timemodified || null,
+        lastReadSucceeded: true,
         updatedAt: new Date(),
       },
       $setOnInsert: {
@@ -239,7 +194,66 @@ async function writeCachedPreview(
   );
 }
 
-async function fetchAttemptExamples(attemptId: number): Promise<{ questionCount: number | null; questionExamples: string[] }> {
+async function writePreviewAttemptReference(
+  courseId: number,
+  quiz: MoodleQuiz,
+  previewUserId: number,
+  attempt: MoodleQuizAttempt,
+  questionTypes: string[]
+): Promise<void> {
+  const collection = await getPreviewCacheCollection();
+
+  await collection.updateOne(
+    {
+      courseId,
+      quizId: quiz.id,
+      previewUserId,
+    },
+    {
+      $set: {
+        attemptId: attempt.id,
+        attemptState: attempt.state || 'unknown',
+        questionTypes,
+        quizTimeModified: quiz.timemodified || null,
+        lastReadSucceeded: false,
+        updatedAt: new Date(),
+      },
+      $setOnInsert: {
+        courseId,
+        quizId: quiz.id,
+        previewUserId,
+      },
+    },
+    {
+      upsert: true,
+    }
+  );
+}
+
+async function markCachedPreviewReadFailure(
+  courseId: number,
+  quizId: number,
+  previewUserId: number
+): Promise<void> {
+  const collection = await getPreviewCacheCollection();
+  await collection.updateOne(
+    {
+      courseId,
+      quizId,
+      previewUserId,
+    },
+    {
+      $set: {
+        lastReadSucceeded: false,
+        updatedAt: new Date(),
+      },
+    }
+  );
+}
+
+async function fetchAttemptExamples(
+  attemptId: number
+): Promise<{ success: boolean; questionCount: number | null; questionExamples: string[] }> {
   let currentPage = 0;
   let pageCount = 0;
   let questionCount: number | null = null;
@@ -249,7 +263,11 @@ async function fetchAttemptExamples(attemptId: number): Promise<{ questionCount:
   while (pageCount < PREVIEW_FETCH_PAGE_LIMIT && questionExamples.length < PREVIEW_EXAMPLE_LIMIT) {
     const response = await getQuizAttemptData(attemptId, currentPage);
     if (response.error) {
-      break;
+      return {
+        success: false,
+        questionCount,
+        questionExamples,
+      };
     }
 
     const data = response.data as MoodleQuizAttemptDataResponse | undefined;
@@ -282,6 +300,7 @@ async function fetchAttemptExamples(attemptId: number): Promise<{ questionCount:
   }
 
   return {
+    success: true,
     questionCount,
     questionExamples,
   };
@@ -295,46 +314,68 @@ async function resolvePreviewData(
 ): Promise<PreviewExtractionResult> {
   const cachedPreview = await readCachedPreview(courseId, quiz, previewUserId);
   if (cachedPreview) {
-    return {
-      questionCount: cachedPreview.questionCount,
-      questionExamples: cachedPreview.questionExamples || [],
-      previewSource: 'cache',
-    };
-  }
+    const extracted = await fetchAttemptExamples(cachedPreview.attemptId);
+    if (extracted.success) {
+      const cachedAttempt: MoodleQuizAttempt = {
+        id: cachedPreview.attemptId,
+        quiz: quiz.id,
+        userid: previewUserId,
+        attempt: 0,
+        state: cachedPreview.attemptState,
+      };
 
-  const attemptsResponse = await getQuizUserAttempts(quiz.id, previewUserId, 'all');
-  const existingAttempt = attemptsResponse.data?.attempts?.find((attempt) => attempt.preview === 1);
+      await writeCachedPreview(
+        courseId,
+        quiz,
+        previewUserId,
+        cachedAttempt,
+        extracted.questionCount,
+        extracted.questionExamples,
+        questionTypes
+      );
 
-  if (existingAttempt) {
-    const extracted = await fetchAttemptExamples(existingAttempt.id);
-    await writeCachedPreview(
-      courseId,
-      quiz,
-      previewUserId,
-      existingAttempt,
-      extracted.questionCount,
-      extracted.questionExamples,
-      questionTypes
-    );
+      return {
+        questionCount: extracted.questionCount,
+        questionExamples: extracted.questionExamples,
+        previewSource: 'cache',
+      };
+    }
 
-    return {
-      ...extracted,
-      previewSource: 'existing_attempt',
-    };
+    await markCachedPreviewReadFailure(courseId, quiz.id, previewUserId);
   }
 
   const startAttemptResponse = await startQuizAttempt(quiz.id, false);
   const newAttempt = startAttemptResponse.data?.attempt;
 
   if (!newAttempt) {
+    if (startAttemptResponse.error?.errorcode === 'attemptstillinprogress') {
+      return {
+        questionCount: quiz.sumgrades ?? null,
+        questionExamples: [],
+        previewSource: 'unavailable',
+        previewStatusMessage: 'Une tentative preview Moodle existe deja mais n est pas encore rattachee au cache local.',
+      };
+    }
+
     return {
       questionCount: quiz.sumgrades ?? null,
       questionExamples: [],
       previewSource: 'unavailable',
+      previewStatusMessage: startAttemptResponse.error?.message || 'Impossible de creer ou reutiliser une tentative preview.',
     };
   }
 
+  await writePreviewAttemptReference(courseId, quiz, previewUserId, newAttempt, questionTypes);
   const extracted = await fetchAttemptExamples(newAttempt.id);
+  if (!extracted.success) {
+    return {
+      questionCount: quiz.sumgrades ?? null,
+      questionExamples: [],
+      previewSource: 'unavailable',
+      previewStatusMessage: 'La tentative preview a ete creee mais la lecture des questions a echoue.',
+    };
+  }
+
   await writeCachedPreview(
     courseId,
     quiz,
@@ -346,7 +387,8 @@ async function resolvePreviewData(
   );
 
   return {
-    ...extracted,
+    questionCount: extracted.questionCount,
+    questionExamples: extracted.questionExamples,
     previewSource: 'new_attempt',
   };
 }
@@ -450,6 +492,7 @@ export async function getCourseQuizzesOverview(courseId: number): Promise<Course
         accessRules: accessInfoResponse.data?.accessrules || [],
         preventAccessReasons: accessInfoResponse.data?.preventaccessreasons || [],
         previewSource: previewData.previewSource,
+        previewStatusMessage: previewData.previewStatusMessage,
         groupOverridesStatus: 'unavailable_with_current_ws' as const,
         questionBankStatus: 'preview_questions_only_until_core_question_ws' as const,
       };
