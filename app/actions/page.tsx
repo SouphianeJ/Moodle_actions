@@ -28,6 +28,12 @@ const actions: ActionItem[] = [
     description: 'Compare les enseignants Hyperplanning ILEPS avec leurs comptes et cours Moodle existants.',
     href: '/actions/teacher-sync-preview',
   },
+  {
+    id: 'course-quizzes',
+    title: "Voir les quiz d'un cours",
+    description: "Affiche les quiz d'un cours Moodle et les informations disponibles via les Web Services.",
+    href: '/actions/course-quizzes',
+  },
 ];
 
 export default function ActionsPage() {

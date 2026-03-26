@@ -245,6 +245,39 @@ export interface MoodleCourseSummary {
   visible?: number;
 }
 
+export interface MoodleCourseDetailsResponse {
+  courses?: MoodleCourseSummary[];
+  warnings?: Array<{ warningcode: string; message: string }>;
+}
+
+export interface MoodleGroup {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+export interface MoodleModuleDate {
+  label?: string;
+  timestamp?: number;
+  dataid?: string;
+}
+
+export interface MoodleCourseModule extends CourseModule {
+  contextid?: number;
+  uservisible?: boolean;
+  visibleoncoursepage?: number;
+  customdata?: string | null;
+  dates?: MoodleModuleDate[];
+}
+
+export interface MoodleCourseSectionWithDetails {
+  id: number;
+  name: string;
+  modules: MoodleCourseModule[];
+}
+
+export type MoodleCourseContentsDetailedResponse = MoodleCourseSectionWithDetails[];
+
 // ===== Typed helper functions for specific WS calls =====
 
 /**
@@ -310,6 +343,13 @@ export async function getCourseContents(courseId: number): Promise<MoodleRespons
 }
 
 /**
+ * Gets course contents with module details such as dates/customdata.
+ */
+export async function getCourseContentsDetailed(courseId: number): Promise<MoodleResponse<MoodleCourseContentsDetailedResponse>> {
+  return callMoodleWS<MoodleCourseContentsDetailedResponse>('core_course_get_contents', { courseid: courseId });
+}
+
+/**
  * Gets full submission status including file information for a specific user and assignment
  */
 export async function getSubmissionStatusFull(assignmentId: number, userId: number): Promise<MoodleResponse<SubmissionStatusFullResponse>> {
@@ -335,6 +375,37 @@ export async function getEnrolledUsersByCourseId(courseId: number): Promise<Mood
 export async function getUserCourses(userId: number): Promise<MoodleResponse<MoodleCourseSummary[]>> {
   return callMoodleWS<MoodleCourseSummary[]>('core_enrol_get_users_courses', {
     userid: userId,
+  });
+}
+
+/**
+ * Gets course details by a field value.
+ */
+export async function getCoursesByField(
+  field: 'id' | 'shortname' | 'idnumber',
+  value: string | number
+): Promise<MoodleResponse<MoodleCourseDetailsResponse>> {
+  return callMoodleWS<MoodleCourseDetailsResponse>('core_course_get_courses_by_field', {
+    field,
+    value,
+  });
+}
+
+/**
+ * Gets all enrolled users for a course.
+ */
+export async function getEnrolledUsers(courseId: number): Promise<MoodleResponse<EnrolledUser[]>> {
+  return callMoodleWS<EnrolledUser[]>('core_enrol_get_enrolled_users', {
+    courseid: courseId,
+  });
+}
+
+/**
+ * Gets groups for a course.
+ */
+export async function getCourseGroups(courseId: number): Promise<MoodleResponse<MoodleGroup[]>> {
+  return callMoodleWS<MoodleGroup[]>('core_group_get_course_groups', {
+    courseid: courseId,
   });
 }
 
