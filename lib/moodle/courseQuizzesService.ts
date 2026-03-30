@@ -345,24 +345,30 @@ async function resolvePreviewData(
   }
 
   const startAttemptResponse = await startQuizAttempt(quiz.id, false);
-  const newAttempt = startAttemptResponse.data?.attempt;
+  let newAttempt = startAttemptResponse.data?.attempt;
 
   if (!newAttempt) {
     if (startAttemptResponse.error?.errorcode === 'attemptstillinprogress') {
+      const forcedStartAttemptResponse = await startQuizAttempt(quiz.id, true);
+      newAttempt = forcedStartAttemptResponse.data?.attempt;
+
+      if (!newAttempt) {
+        return {
+          questionCount: quiz.sumgrades ?? null,
+          questionExamples: [],
+          previewSource: 'unavailable',
+          previewStatusMessage: forcedStartAttemptResponse.error?.message
+            || 'Une tentative preview Moodle existe deja mais n a pas pu etre recreee automatiquement.',
+        };
+      }
+    } else {
       return {
         questionCount: quiz.sumgrades ?? null,
         questionExamples: [],
         previewSource: 'unavailable',
-        previewStatusMessage: 'Une tentative preview Moodle existe deja mais n est pas encore rattachee au cache local.',
+        previewStatusMessage: startAttemptResponse.error?.message || 'Impossible de creer ou reutiliser une tentative preview.',
       };
     }
-
-    return {
-      questionCount: quiz.sumgrades ?? null,
-      questionExamples: [],
-      previewSource: 'unavailable',
-      previewStatusMessage: startAttemptResponse.error?.message || 'Impossible de creer ou reutiliser une tentative preview.',
-    };
   }
 
   await writePreviewAttemptReference(courseId, quiz, previewUserId, newAttempt, questionTypes);

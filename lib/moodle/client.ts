@@ -575,7 +575,7 @@ export async function startQuizAttempt(
 ): Promise<MoodleResponse<MoodleQuizStartAttemptResponse>> {
   return callMoodleWS<MoodleQuizStartAttemptResponse>('mod_quiz_start_attempt', {
     quizid: quizId,
-    forcenew: forceNew,
+    forcenew: forceNew ? 1 : 0,
   });
 }
 
