@@ -34,6 +34,12 @@ const actions: ActionItem[] = [
     description: "Affiche les quiz d'un cours Moodle et les informations disponibles via les Web Services.",
     href: '/actions/course-quizzes',
   },
+  {
+    id: 'exam-request',
+    title: 'Exam builder MCP',
+    description: "Planifie et exécute une création d'examen Moodle à partir d'une demande en langage naturel.",
+    href: '/actions/exam-request',
+  },
 ];
 
 export default function ActionsPage() {

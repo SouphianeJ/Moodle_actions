@@ -214,3 +214,15 @@ Cette action permet d'exporter les feedbacks des étudiants pour un devoir Moodl
 ## 📝 License
 
 MIT
+
+## Exam builder MCP
+
+New env vars used by the exam-request action:
+
+- `CODEX_BRIDGE_URL`
+- `AGENT_RUNTIME_APP_ID` (set to `moodle-actions`)
+- `PROXY_KEY_ID_ACTIVE`
+- `PROXY_SIGNING_KEY_ACTIVE`
+- `MOODLE_EXAM_MCP_PROXY_URL`
+
+The new `/actions/exam-request` flow persists request transcripts, validated plans, approvals, proxy payloads, and execution results in MongoDB.
